@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en" data-color-scheme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Access - 20PlusPercent</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Additional styles specific to auth pages */
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-16);
+        }
+        .auth-card {
+            width: 100%;
+            max-width: 420px;
+            padding: var(--space-32);
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: var(--space-24);
+        }
+        .auth-title {
+            font-size: var(--font-size-2xl);
+            margin-top: var(--space-16);
+        }
+        .auth-subtitle {
+            color: var(--color-text-secondary);
+            margin-top: var(--space-8);
+        }
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-16);
+        }
+        .auth-divider {
+            margin: var(--space-24) 0;
+            text-align: center;
+            position: relative;
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-sm);
+        }
+        .auth-divider::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            width: 42%;
+            height: 1px;
+            background: var(--color-border);
+        }
+        .auth-divider::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            width: 42%;
+            height: 1px;
+            background: var(--color-border);
+        }
+        .auth-footer {
+            text-align: center;
+            margin-top: var(--space-24);
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card card">
+            <div class="auth-header">
+                <a href="/" class="logo">20Plus<span class="logo-accent">Percent</span></a>
+                <h1 class="auth-title">Request Platform Access</h1>
+                <p class="auth-subtitle">Create your account to get started.</p>
+            </div>
+
+            <div id="alertError" class="status status--error" style="display: none; margin-bottom: 16px;">
+                <i data-lucide="alert-triangle"></i>
+                <span id="errorMsg">Registration failed.</span>
+            </div>
+             <div id="alertSuccess" class="status status--success" style="display: none; margin-bottom: 16px;">
+                <i data-lucide="check-circle"></i>
+                <span id="successMsg">Success! Redirecting...</span>
+            </div>
+
+            <form id="registerForm" class="auth-form">
+                <div class="form-group">
+                    <label for="name" class="form-label">Full Name</label>
+                    <input type="text" id="name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="email" class="form-label">Email Address</label>
+                    <input type="email" id="email" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" class="form-control" required minlength="6">
+                </div>
+                <button type="submit" id="registerBtn" class="btn btn--primary btn--full-width">
+                    Create Account
+                </button>
+            </form>
+
+            <div class="auth-divider">
+                <span>OR</span>
+            </div>
+
+            <button id="googleLoginBtn" class="btn btn--secondary btn--full-width">
+                <i data-lucide="chrome" style="width: 18px; height: 18px; margin-right: 8px;"></i>
+                Continue with Google
+            </button>
+
+            <p class="auth-footer">
+                Already have an account? <a href="/login.html">Sign In</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script> lucide.createIcons(); </script>
+
+    <script type="module">
+        import { auth, db, createUserWithEmailAndPassword, setDoc, doc, onAuthStateChanged, googleProvider, signInWithPopup, getDoc } from './firebase-init.js';
+
+        const alertError = document.getElementById('alertError');
+        const errorMsg = document.getElementById('errorMsg');
+        const alertSuccess = document.getElementById('alertSuccess');
+        const successMsg = document.getElementById('successMsg');
+
+        // Redirect if already logged in
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                window.location.href = '/portfolio.html';
+            }
+        });
+        
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const registerBtn = document.getElementById('registerBtn');
+            alertError.style.display = 'none';
+            alertSuccess.style.display = 'none';
+            registerBtn.disabled = true;
+            registerBtn.textContent = 'Creating Account...';
+
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Store additional user details in Firestore
+                await setDoc(doc(db, "users", user.uid), {
+                    name: name,
+                    email: email,
+                    createdAt: new Date()
+                });
+
+                successMsg.textContent = 'Account created! Redirecting to your portfolio...';
+                alertSuccess.style.display = 'flex';
+
+                setTimeout(() => {
+                    window.location.href = '/portfolio.html';
+                }, 1500);
+
+            } catch (error) {
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMsg.textContent = 'This email is already registered.';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMsg.textContent = 'Password should be at least 6 characters.';
+                } else {
+                    console.error("Registration Error: ", error);
+                    errorMsg.textContent = 'An unknown error occurred.';
+                }
+                alertError.style.display = 'flex';
+                registerBtn.disabled = false;
+                registerBtn.textContent = 'Create Account';
+            }
+        });
+
+        document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+            alertError.style.display = 'none';
+            try {
+                const result = await signInWithPopup(auth, googleProvider);
+                const user = result.user;
+
+                // Check if a document for this user already exists in Firestore
+                const userDocRef = doc(db, "users", user.uid);
+                const userDoc = await getDoc(userDocRef);
+
+                // If the user is new (just registered with Google), create a document for them
+                if (!userDoc.exists()) {
+                    await setDoc(userDocRef, {
+                        name: user.displayName || 'Google User',
+                        email: user.email,
+                        createdAt: new Date()
+                    });
+                }
+                // onAuthStateChanged will handle the redirect to portfolio.html
+            } catch (error) {
+                console.error("Google Sign-In Error:", error);
+                if (error.code === 'auth/popup-closed-by-user') {
+                    errorMsg.textContent = 'Sign-in window was closed. Please try again.';
+                } else if (error.code === 'auth/cancelled-popup-request') {
+                     errorMsg.textContent = 'Multiple sign-in attempts detected. Please try again.';
+                }
+                else {
+                    errorMsg.textContent = 'An error occurred with Google Sign-In.';
+                }
+                alertError.style.display = 'flex';
+            }
+        });
+    </script>
+</body>
+</html>
