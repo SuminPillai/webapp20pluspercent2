@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en" data-color-scheme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Dashboard - 20PlusPercent</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .profit { color: #10b981; }
+        .loss { color: #ef4444; }
+        .loader {
+            border: 4px solid var(--color-border);
+            border-top: 4px solid var(--color-primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-background text-text">
+    <!-- Auth Guard -->
+    <script src="auth-guard.js" type="module"></script>
+
+    <!-- Navigation -->
+    <nav class="bg-surface shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="logo text-xl">20Plus<span class="logo-accent">Percent</span></a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="userEmail" class="text-sm text-text-secondary hidden md:block"></span>
+                    <button id="logoutBtn" class="btn btn--secondary btn--sm">
+                        <i data-lucide="log-out" class="w-4 h-4 mr-2"></i>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Dashboard -->
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Dashboard Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-text">Portfolio Dashboard</h1>
+            <p class="text-text-secondary mt-1">Real-time analytics and market news.</p>
+        </div>
+
+        <!-- Portfolio Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Total Value -->
+            <div class="card p-6">
+                <p class="text-sm font-medium text-text-secondary">Total Portfolio Value</p>
+                <p class="text-2xl font-bold text-primary mt-1" id="totalValue">₹0.00</p>
+            </div>
+            <!-- Total Investment -->
+            <div class="card p-6">
+                <p class="text-sm font-medium text-text-secondary">Total Investment</p>
+                <p class="text-2xl font-bold text-text mt-1" id="totalInvestment">₹0.00</p>
+            </div>
+            <!-- Overall P&L -->
+            <div class="card p-6">
+                <p class="text-sm font-medium text-text-secondary">Overall Gain/Loss</p>
+                <p class="text-2xl font-bold mt-1" id="totalGainLoss">₹0.00</p>
+            </div>
+            <!-- Total Holdings -->
+            <div class="card p-6">
+                <p class="text-sm font-medium text-text-secondary">Total Holdings</p>
+                <p class="text-2xl font-bold text-text mt-1" id="totalHoldings">0</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left Column: Transactions & Holdings -->
+            <div class="lg:col-span-2 space-y-8">
+                <!-- Add Transaction Section -->
+                <div class="card p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i data-lucide="plus-circle" class="w-5 h-5 mr-2 text-primary"></i>
+                        Add Transaction
+                    </h2>
+                    <div id="addTransactionForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div class="form-group">
+                            <label for="ticker" class="form-label">Stock Ticker (e.g., RELIANCE.NS)</label>
+                            <input type="text" id="ticker" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="quantity" class="form-label">Quantity</label>
+                            <input type="number" id="quantity" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="transactionDate" class="form-label">Transaction Date</label>
+                            <input type="date" id="transactionDate" class="form-control">
+                        </div>
+                        <div class="md:col-span-3">
+                             <button id="addTransactionBtn" class="btn btn--primary w-full md:w-auto">
+                                <span id="btnText">Add Transaction</span>
+                                <div id="btnLoader" class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></div>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="messageBox" class="hidden status mt-4"></div>
+                </div>
+
+                <!-- Portfolio Holdings Table -->
+                <div class="card p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                         <i data-lucide="briefcase" class="w-5 h-5 mr-2 text-primary"></i>
+                        Portfolio Holdings
+                    </h2>
+                    <div id="holdingsLoader" class="flex justify-center py-8"><div class="loader"></div></div>
+                    <div id="holdingsContent" class="overflow-x-auto hidden">
+                        <table class="min-w-full">
+                            <thead class="border-b border-border">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Ticker</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Quantity</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Avg. Cost</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Current Price</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">P&L</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="holdingsTable" class="divide-y divide-border">
+                                <!-- Holdings will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Market News -->
+            <div class="card p-6">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i data-lucide="newspaper" class="w-5 h-5 mr-2 text-primary"></i>
+                    Market News
+                </h2>
+                <div id="newsLoader" class="flex justify-center py-8"><div class="loader"></div></div>
+                <div id="newsContent" class="space-y-4 max-h-[600px] overflow-y-auto hidden">
+                    <!-- News articles will be populated here -->
+                </div>
+                 <div id="newsError" class="status status--error hidden">Could not fetch news.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script type="module">
+        import { auth, db, onAuthStateChanged, signOut, doc, getDoc, setDoc, addDoc, collection, getDocs, onSnapshot, deleteDoc } from './firebase-init.js';
+
+        let currentUser = null;
+        // Using a public proxy for yfinance data
+        const financeApiBase = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+        const newsApiUrl = 'https://query2.finance.yahoo.com/v1/finance/search?q=india&newsCount=15';
+
+        // UI Elements
+        const addBtn = document.getElementById('addTransactionBtn');
+        const btnText = document.getElementById('btnText');
+        const btnLoader = document.getElementById('btnLoader');
+        const messageBox = document.getElementById('messageBox');
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('userEmail').textContent = user.email;
+                initializeDashboard();
+            } else {
+                window.location.href = '/login.html';
+            }
+        });
+
+        function initializeDashboard() {
+            lucide.createIcons();
+            setDefaultDate();
+            fetchNews();
+            listenForPortfolioUpdates();
+            addBtn.addEventListener('click', addTransaction);
+            document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+        }
+
+        function setDefaultDate() {
+            document.getElementById('transactionDate').value = new Date().toISOString().split('T')[0];
+        }
+
+        async function fetchNews() {
+            const newsLoader = document.getElementById('newsLoader');
+            const newsContent = document.getElementById('newsContent');
+            const newsError = document.getElementById('newsError');
+
+            newsLoader.style.display = 'flex';
+            newsContent.style.display = 'none';
+            newsError.style.display = 'none';
+
+            try {
+                const response = await fetch(newsApiUrl);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+
+                if (data.news && data.news.length > 0) {
+                    newsContent.innerHTML = data.news.map(article => `
+                        <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="block p-3 rounded-lg hover:bg-secondary transition-colors">
+                            <p class="font-semibold text-sm text-text">${article.title}</p>
+                            <p class="text-xs text-text-secondary mt-1">${article.publisher} - ${new Date(article.providerPublishTime * 1000).toLocaleDateString()}</p>
+                        </a>
+                    `).join('');
+                    newsContent.style.display = 'block';
+                } else {
+                    throw new Error("No news articles found in API response.");
+                }
+            } catch (error) {
+                console.error("Failed to fetch news:", error);
+                newsError.textContent = 'Could not fetch market news at this time.';
+                newsError.style.display = 'flex';
+            } finally {
+                newsLoader.style.display = 'none';
+            }
+        }
+
+        function listenForPortfolioUpdates() {
+            if (!currentUser) return;
+            const holdingsRef = collection(db, 'users', currentUser.uid, 'portfolio');
+
+            onSnapshot(holdingsRef, async (querySnapshot) => {
+                document.getElementById('holdingsLoader').style.display = 'flex';
+                document.getElementById('holdingsContent').style.display = 'none';
+
+                let holdings = [];
+                querySnapshot.forEach((doc) => {
+                    holdings.push({ id: doc.id, ...doc.data() });
+                });
+
+                await updateDashboard(holdings);
+
+                document.getElementById('holdingsLoader').style.display = 'none';
+                document.getElementById('holdingsContent').style.display = 'block';
+            });
+        }
+
+        async function updateDashboard(holdings) {
+            let totalValue = 0;
+            let totalInvestment = 0;
+
+            const pricePromises = holdings.map(h => fetchCurrentPrice(h.id));
+            const currentPrices = await Promise.all(pricePromises);
+
+            const tbody = document.getElementById('holdingsTable');
+            tbody.innerHTML = '';
+
+            if (holdings.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-text-secondary">No holdings yet. Add a transaction to get started.</td></tr>';
+            }
+
+            holdings.forEach((holding, index) => {
+                const currentPrice = currentPrices[index];
+                const currentValue = currentPrice * holding.quantity;
+                const pnl = currentValue - holding.totalCost;
+
+                totalValue += currentValue;
+                totalInvestment += holding.totalCost;
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-4 whitespace-nowrap font-medium">${holding.id}</td>
+                    <td class="px-4 py-4 whitespace-nowrap">${holding.quantity}</td>
+                    <td class="px-4 py-4 whitespace-nowrap">₹${formatNumber(holding.avgBuyPrice)}</td>
+                    <td class="px-4 py-4 whitespace-nowrap">₹${formatNumber(currentPrice)}</td>
+                    <td class="px-4 py-4 whitespace-nowrap font-medium ${pnl >= 0 ? 'profit' : 'loss'}">₹${formatNumber(pnl)}</td>
+                    <td class="px-4 py-4 whitespace-nowrap">
+                        <button onclick="window.deleteHolding('${holding.id}')" class="btn btn--secondary btn--sm">
+                           <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            lucide.createIcons();
+
+            const totalGainLoss = totalValue - totalInvestment;
+            document.getElementById('totalValue').textContent = `₹${formatNumber(totalValue)}`;
+            document.getElementById('totalInvestment').textContent = `₹${formatNumber(totalInvestment)}`;
+            document.getElementById('totalGainLoss').textContent = `₹${formatNumber(totalGainLoss)}`;
+            document.getElementById('totalGainLoss').className = `text-2xl font-bold mt-1 ${totalGainLoss >= 0 ? 'profit' : 'loss'}`;
+            document.getElementById('totalHoldings').textContent = holdings.length;
+        }
+
+        async function addTransaction() {
+            if (!currentUser) return;
+
+            const ticker = document.getElementById('ticker').value.toUpperCase().trim();
+            const date = document.getElementById('transactionDate').value;
+            const quantity = parseFloat(document.getElementById('quantity').value);
+
+            if (!ticker || !date || isNaN(quantity) || quantity <= 0) {
+                showMessage('Please fill all fields correctly.', 'error');
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                // 1. Fetch historical price for the transaction date
+                const price = await fetchHistoricalPrice(ticker, date);
+
+                // 2. Add to transactions log in Firestore
+                const transactionsRef = collection(db, 'users', currentUser.uid, 'transactions');
+                await addDoc(transactionsRef, { ticker, date, quantity, price, createdAt: new Date() });
+
+                // 3. Update (or create) the consolidated holding in Firestore
+                const holdingDocRef = doc(db, 'users', currentUser.uid, 'portfolio', ticker);
+                const holdingDoc = await getDoc(holdingDocRef);
+
+                let newQuantity = quantity;
+                let newTotalCost = quantity * price;
+
+                if (holdingDoc.exists()) {
+                    const currentData = holdingDoc.data();
+                    newQuantity += currentData.quantity;
+                    newTotalCost += currentData.totalCost;
+                }
+
+                const newAvgBuyPrice = newTotalCost / newQuantity;
+
+                await setDoc(holdingDocRef, {
+                    quantity: newQuantity,
+                    avgBuyPrice: newAvgBuyPrice,
+                    totalCost: newTotalCost
+                });
+
+                showMessage('Transaction added successfully!', 'success');
+                document.getElementById('addTransactionForm').reset();
+                setDefaultDate();
+
+            } catch (error) {
+                console.error("Failed to add transaction:", error);
+                showMessage(error.message, 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function fetchHistoricalPrice(ticker, date) {
+            const selectedDate = new Date(date);
+            // yfinance API needs timestamps in seconds
+            const period1 = Math.floor(selectedDate.getTime() / 1000);
+            // We fetch a small window to ensure we get the date if it was a holiday
+            const period2 = period1 + 86400 * 3;
+
+            const url = `${financeApiBase}${ticker}?period1=${period1}&period2=${period2}&interval=1d`;
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!data.chart || data.chart.error) {
+                throw new Error("Could not fetch price. Check the ticker symbol (e.g., RELIANCE.NS).");
+            }
+
+            const result = data.chart.result[0];
+            const timestamps = result.timestamp;
+            const quotes = result.indicators.quote[0];
+
+            let price = null;
+            for (let i = 0; i < timestamps.length; i++) {
+                const quoteDate = new Date(timestamps[i] * 1000).toISOString().split('T')[0];
+                if (quoteDate === date) {
+                    price = quotes.close[i];
+                    break;
+                }
+            }
+
+            if (price === null) {
+                throw new Error(`No trading data for ${ticker} on ${date}. Please select a different day.`);
+            }
+
+            return price;
+        }
+
+        async function fetchCurrentPrice(ticker) {
+            try {
+                 const url = `${financeApiBase}${ticker}?range=1d&interval=1m`;
+                 const response = await fetch(url);
+                 const data = await response.json();
+                 if (data.chart && data.chart.result && data.chart.result[0]) {
+                     return data.chart.result[0].meta.regularMarketPrice;
+                 }
+                 return 0; // Fallback
+            } catch (error) {
+                console.error(`Could not fetch current price for ${ticker}`, error);
+                return 0; // Return 0 if API fails, so dashboard doesn't break
+            }
+        }
+
+        window.deleteHolding = async function(ticker) {
+            if (!currentUser || !confirm(`This will delete the entire holding for ${ticker}. Are you sure? The individual transaction records will be kept.`)) {
+                return;
+            }
+            const holdingDocRef = doc(db, 'users', currentUser.uid, 'portfolio', ticker);
+            await deleteDoc(holdingDocRef);
+            showMessage(`${ticker} holding deleted.`, 'info');
+        }
+
+        function setLoading(isLoading) {
+            addBtn.disabled = isLoading;
+            btnText.style.display = isLoading ? 'none' : 'block';
+            btnLoader.style.display = isLoading ? 'block' : 'none';
+        }
+
+        function showMessage(msg, type) {
+            messageBox.textContent = msg;
+            messageBox.className = `status status--${type} flex`;
+            setTimeout(() => {
+                messageBox.className = 'hidden status';
+            }, 4000);
+        }
+
+        function formatNumber(num) {
+            if (typeof num !== 'number' || isNaN(num)) return '0.00';
+            return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+        }
+
+    </script>
+</body>
+</html>

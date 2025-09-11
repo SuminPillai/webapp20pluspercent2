@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en" data-color-scheme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - 20PlusPercent</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Additional styles specific to auth pages */
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-16);
+        }
+        .auth-card {
+            width: 100%;
+            max-width: 420px;
+            padding: var(--space-32);
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: var(--space-24);
+        }
+        .auth-title {
+            font-size: var(--font-size-2xl);
+            margin-top: var(--space-16);
+        }
+        .auth-subtitle {
+            color: var(--color-text-secondary);
+            margin-top: var(--space-8);
+        }
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-16);
+        }
+        .form-options {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-8);
+        }
+        .form-check {
+            display: flex;
+            align-items: center;
+            gap: var(--space-8);
+            font-size: var(--font-size-sm);
+            cursor: pointer;
+        }
+        .form-link {
+            font-size: var(--font-size-sm);
+        }
+        .auth-divider {
+            margin: var(--space-24) 0;
+            text-align: center;
+            position: relative;
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-sm);
+        }
+        .auth-divider::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            width: 42%;
+            height: 1px;
+            background: var(--color-border);
+        }
+        .auth-divider::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            width: 42%;
+            height: 1px;
+            background: var(--color-border);
+        }
+        .auth-footer {
+            text-align: center;
+            margin-top: var(--space-24);
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card card">
+            <div class="auth-header">
+                <a href="/" class="logo">20Plus<span class="logo-accent">Percent</span></a>
+                <h1 class="auth-title">Client Portal Access</h1>
+                <p class="auth-subtitle">Enter your credentials to access the platform.</p>
+            </div>
+
+            <div id="alertError" class="status status--error" style="display: none; margin-bottom: 16px;">
+                <i data-lucide="alert-triangle"></i>
+                <span id="errorMsg">Invalid credentials.</span>
+            </div>
+
+            <form id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label for="email" class="form-label">Email Address</label>
+                    <input type="email" id="email" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" class="form-control" required>
+                </div>
+                <div class="form-options">
+                    <label class="form-check">
+                        <input type="checkbox" id="remember">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="#" class="form-link">Forgot Password?</a>
+                </div>
+                <button type="submit" id="loginBtn" class="btn btn--primary btn--full-width">
+                    Sign In
+                </button>
+            </form>
+
+            <div class="auth-divider">
+                <span>OR</span>
+            </div>
+
+            <button id="googleLoginBtn" class="btn btn--secondary btn--full-width">
+                <i data-lucide="chrome" style="width: 18px; height: 18px; margin-right: 8px;"></i>
+                Continue with Google
+            </button>
+
+            <p class="auth-footer">
+                Don't have an account? <a href="/register.html">Request Access</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script> lucide.createIcons(); </script>
+
+    <script type="module">
+        import { auth, db, googleProvider, setPersistence, browserLocalPersistence, browserSessionPersistence, signInWithPopup, signInWithEmailAndPassword, onAuthStateChanged, doc, getDoc, setDoc } from './firebase-init.js';
+
+        const alertError = document.getElementById('alertError');
+        const errorMsg = document.getElementById('errorMsg');
+
+        // Redirect if already logged in
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in, redirect to the main application page.
+                window.location.href = '/portfolio.html';
+            }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const loginBtn = document.getElementById('loginBtn');
+            alertError.style.display = 'none';
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing In...';
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const rememberMe = document.getElementById('remember').checked;
+            const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+
+            try {
+                await setPersistence(auth, persistence);
+                await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will handle redirect
+            } catch (error) {
+                errorMsg.textContent = 'Invalid email or password. Please try again.';
+                alertError.style.display = 'flex';
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+        });
+
+        document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+            alertError.style.display = 'none';
+            try {
+                const result = await signInWithPopup(auth, googleProvider);
+                const user = result.user;
+
+                // Check if a document for this user already exists in Firestore
+                const userDocRef = doc(db, "users", user.uid);
+                const userDoc = await getDoc(userDocRef);
+
+                // If the user is new (signed up with Google), create a document for them
+                if (!userDoc.exists()) {
+                    await setDoc(userDocRef, {
+                        name: user.displayName || 'Google User',
+                        email: user.email,
+                        createdAt: new Date()
+                    });
+                }
+                // onAuthStateChanged will handle the redirect
+            } catch (error) {
+                console.error("Google Sign-In Error:", error);
+                if (error.code === 'auth/popup-closed-by-user') {
+                    errorMsg.textContent = 'Sign-in window was closed. Please try again.';
+                } else if (error.code === 'auth/cancelled-popup-request') {
+                     errorMsg.textContent = 'Multiple sign-in attempts detected. Please try again.';
+                }
+                else {
+                    errorMsg.textContent = 'An error occurred with Google Sign-In.';
+                }
+                alertError.style.display = 'flex';
+            }
+        });
+    </script>
+</body>
+</html>
